@@ -1,12 +1,3 @@
--- Users: authentication, identity, and RBAC.
---
--- Security notes:
---   - email stored as CITEXT (case-insensitive, no manual lowercasing needed)
---   - password_hash must be a bcrypt hash ($2b$ prefix, 60 chars)
---     the backend must NEVER store plaintext or non-bcrypt hashes
---   - is_active allows soft-disable without cascading deletes
---   - email_verified prevents unconfirmed accounts from full access
-
 CREATE TABLE users (
     id                  UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
     email               CITEXT       NOT NULL UNIQUE,
@@ -20,7 +11,6 @@ CREATE TABLE users (
 
     CONSTRAINT email_format     CHECK (email ~* '^[^@\s]+@[^@\s]+\.[^@\s]+$'),
     CONSTRAINT email_length     CHECK (char_length(email) <= 254),
-    -- bcrypt hashes are always exactly 60 characters and start with $2b$
     CONSTRAINT password_bcrypt  CHECK (password_hash ~ '^\$2[aby]\$[0-9]{2}\$.{53}$'),
     CONSTRAINT name_length      CHECK (name IS NULL OR char_length(name) <= 100)
 );

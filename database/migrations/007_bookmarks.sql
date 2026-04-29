@@ -1,9 +1,3 @@
--- User ↔ Offer bookmarks (N:N).
---
--- Enables the "personal features" for the USER role (subject page 4).
--- Composite primary key prevents duplicate bookmarks without a separate UNIQUE.
--- Cascade on both sides: deleting a user or an offer cleans up silently.
-
 CREATE TABLE user_offer_bookmarks (
     user_id         UUID         NOT NULL REFERENCES users(id)  ON DELETE CASCADE,
     offer_id        UUID         NOT NULL REFERENCES offers(id) ON DELETE CASCADE,

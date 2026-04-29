@@ -1,6 +1,3 @@
--- All application enums in one place.
--- Adding a value to an enum requires ALTER TYPE — keep them minimal and stable.
-
 CREATE TYPE user_role AS ENUM (
     'user',
     'admin'

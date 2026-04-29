@@ -1,16 +1,3 @@
--- Audit log: immutable record of admin moderation actions.
---
--- Required for the admin interface (subject page 4) and counts as evidence
--- for the "action/event logging" bonus (subject page 8).
---
--- Design choices:
---   - actor_user_id SET NULL on user deletion: the log entry survives even if
---     the admin account is removed (audit trail must not be lossy)
---   - No UPDATE or DELETE should ever be issued on this table (append-only)
---   - metadata JSONB holds action-specific data (e.g. previous status, reason)
---   - target_type + target_id are generic: one table handles moderation of
---     offers, users, or any future entity
-
 CREATE TABLE audit_log (
     id              UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
     actor_user_id   UUID         REFERENCES users(id) ON DELETE SET NULL,

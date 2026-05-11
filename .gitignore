@@ -1,0 +1,12 @@
+.env
+.env.local
+.env.*.local
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+target/
+jobAggregator-project.pdf

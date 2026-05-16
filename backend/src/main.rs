@@ -20,6 +20,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let database_url = dotenvy::var("DATABASE_URL")?;
     let db = PgPool::connect(&database_url).await?;
     let jwt_secret = dotenvy::var("JWT_SECRET")?;
+    let cors_origins= dotenvy::var("CORS_ALLOWED_ORIGINS")?.split(',').filter_map(|origin| origin.trim().parse().ok()).collect();
+
 
     sqlx::migrate!("./migrations").run(&db).await?;
 
@@ -28,9 +30,9 @@ async fn main() -> Result<(), Box<dyn Error>> {
         pepper: Arc::new(Secret::new(pepper)),
         jwt_secret: Arc::new(Secret::new(jwt_secret)),
     };
-    let app = ft_app(app);
+    let app = ft_app(app, cors_origins);
 
-    let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await?;
+    let listener = tokio::net::TcpListener::bind("0.0.0.0:8080").await?;
     axum::serve(
         listener,
         app.into_make_service_with_connect_info::<SocketAddr>(),

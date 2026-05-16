@@ -4,6 +4,8 @@ use sqlx::PgPool;
 use std::sync::Arc;
 use tower_http::cors::CorsLayer;
 use tower_http::trace::TraceLayer;
+use axum::http::{HeaderValue, Method, header};
+use std::time::Duration;
 
 pub mod error;
 pub mod routes;
@@ -15,13 +17,16 @@ pub struct AppState {
     pub jwt_secret: Arc<Secret<String>>,
 }
 
-pub fn ft_app(app: AppState) -> Router {
+pub fn ft_app(app: AppState, cors_origins: Vec<HeaderValue>) -> Router {
+
+    let cors = CorsLayer::new().allow_origin(cors_origins).allow_methods([Method::GET, Method::POST, Method::PATCH, Method::DELETE]).allow_credentials(true).allow_headers([header::CONTENT_TYPE, header::AUTHORIZATION, header::ACCEPT]).max_age(Duration::from_secs(60) * 10);
+
     Router::new()
         .route("/register", post(crate::routes::auth::ft_register))
         .route("/login", post(crate::routes::auth::ft_login))
         .route("/refresh", post(crate::routes::auth::ft_refresh))
         .route("/logout", post(crate::routes::auth::ft_logout))
-        .layer(CorsLayer::permissive())
+        .layer(cors)
         .layer(TraceLayer::new_for_http())
         .with_state(app)
 }

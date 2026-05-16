@@ -1,11 +1,11 @@
+use axum::http::{HeaderValue, Method, header};
 use axum::{Router, routing::post};
 use secrecy::Secret;
 use sqlx::PgPool;
 use std::sync::Arc;
+use std::time::Duration;
 use tower_http::cors::CorsLayer;
 use tower_http::trace::TraceLayer;
-use axum::http::{HeaderValue, Method, header};
-use std::time::Duration;
 
 pub mod error;
 pub mod routes;
@@ -18,8 +18,12 @@ pub struct AppState {
 }
 
 pub fn ft_app(app: AppState, cors_origins: Vec<HeaderValue>) -> Router {
-
-    let cors = CorsLayer::new().allow_origin(cors_origins).allow_methods([Method::GET, Method::POST, Method::PATCH, Method::DELETE]).allow_credentials(true).allow_headers([header::CONTENT_TYPE, header::AUTHORIZATION, header::ACCEPT]).max_age(Duration::from_secs(60) * 10);
+    let cors = CorsLayer::new()
+        .allow_origin(cors_origins)
+        .allow_methods([Method::GET, Method::POST, Method::PATCH, Method::DELETE])
+        .allow_credentials(true)
+        .allow_headers([header::CONTENT_TYPE, header::AUTHORIZATION, header::ACCEPT])
+        .max_age(Duration::from_secs(60) * 10);
 
     Router::new()
         .route("/register", post(crate::routes::auth::ft_register))

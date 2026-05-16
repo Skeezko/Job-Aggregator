@@ -3,6 +3,7 @@ use secrecy::Secret;
 use sqlx::PgPool;
 use std::sync::Arc;
 use tower_http::cors::CorsLayer;
+use tower_http::trace::TraceLayer;
 
 pub mod error;
 pub mod routes;
@@ -21,5 +22,6 @@ pub fn ft_app(app: AppState) -> Router {
         .route("/refresh", post(crate::routes::auth::ft_refresh))
         .route("/logout", post(crate::routes::auth::ft_logout))
         .layer(CorsLayer::permissive())
+        .layer(TraceLayer::new_for_http())
         .with_state(app)
 }

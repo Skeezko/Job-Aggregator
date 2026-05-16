@@ -1,14 +1,22 @@
 use jobaggr_backend::{AppState, ft_app};
 use secrecy::Secret;
 use sqlx::PgPool;
+use tracing_subscriber::{EnvFilter, fmt};
+use tracing_subscriber::layer::SubscriberExt;
+use tracing_subscriber::util::SubscriberInitExt;
 use std::error::Error;
 use std::net::SocketAddr;
 use std::sync::Arc;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
-    let pepper = dotenvy::var("PEPPER")?;
 
+    let _ = dotenvy::dotenv();
+    let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"));
+    tracing_subscriber::registry().with(filter).with(fmt::layer().pretty()).init();
+    tracing::info!("Starting backend");
+
+    let pepper = dotenvy::var("PEPPER")?;
     let database_url = dotenvy::var("DATABASE_URL")?;
     let db = PgPool::connect(&database_url).await?;
     let jwt_secret = dotenvy::var("JWT_SECRET")?;

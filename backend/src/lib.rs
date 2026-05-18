@@ -11,6 +11,7 @@ use tower_http::limit::RequestBodyLimitLayer;
 
 pub mod error;
 pub mod routes;
+pub mod utils;
 
 #[derive(Clone)]
 pub struct AppState {

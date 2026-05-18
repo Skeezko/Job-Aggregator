@@ -152,6 +152,7 @@ pub async fn ft_login(
             })
             .await
             .ok();
+            tracing::warn!(ip = %addr.ip(), email = %lowercased_email, "User do not exist");
             return Err(AppError::InvalidCredentials);
         }
     };
@@ -160,9 +161,12 @@ pub async fn ft_login(
     let password = user_input.password.clone();
     let pepper = app.pepper.clone();
 
-    tokio::task::spawn_blocking(move || password::ft_check_password(hash, password, pepper))
-        .await
-        .map_err(|e| AppError::Internal(anyhow::anyhow!("spawn_blocking join: {}", e)))??;
+    let is_valid_password = tokio::task::spawn_blocking(move || password::ft_check_password(hash, password, pepper)).await.map_err(|e| AppError::Internal(anyhow::anyhow!("spawn_blocking join: {}", e)))??;
+    
+    if !is_valid_password {
+        tracing::warn!(ip = %addr.ip(), user_id = %user.id, email = %lowercased_email, "Passsword Incorrect");
+        return Err(AppError::InvalidCredentials);
+    }
 
     let access_token = ft_generate_access_token(&app.jwt_secret, user.id, user.role)?;
     let refresh_tokens = ft_generate_refresh_token();
@@ -221,7 +225,7 @@ pub async fn ft_refresh(
         )
         .execute(&app.db)
         .await?;
-        tracing::warn!(user_id = %reused.user_id, "Refresh token reused, all sessions revoked");
+        tracing::warn!(ip = %addr.ip(), user_id = %reused.user_id, "Refresh token reused, all sessions revoked");
         return Err(AppError::TokenReused);
     }
 

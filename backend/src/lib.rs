@@ -7,6 +7,7 @@ use std::time::Duration;
 use tower_http::cors::CorsLayer;
 use tower_http::trace::TraceLayer;
 use tower_http::set_header::SetResponseHeaderLayer;
+use tower_http::limit::RequestBodyLimitLayer;
 
 pub mod error;
 pub mod routes;
@@ -31,6 +32,7 @@ pub fn ft_app(app: AppState, cors_origins: Vec<HeaderValue>) -> Router {
         .route("/login", post(crate::routes::auth::ft_login))
         .route("/refresh", post(crate::routes::auth::ft_refresh))
         .route("/logout", post(crate::routes::auth::ft_logout))
+        .layer(RequestBodyLimitLayer::new(4096))
         .layer(SetResponseHeaderLayer::overriding(header::X_CONTENT_TYPE_OPTIONS, HeaderValue::from_static("nosniff")))
         .layer(SetResponseHeaderLayer::overriding(header::X_FRAME_OPTIONS, HeaderValue::from_static("DENY")))
         .layer(SetResponseHeaderLayer::overriding(header::REFERRER_POLICY, HeaderValue::from_static("strict-origin-when-cross-origin")))

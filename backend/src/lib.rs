@@ -20,6 +20,7 @@ pub fn ft_app(app: AppState) -> Router {
         .route("/login", post(crate::routes::auth::ft_login))
         .route("/refresh", post(crate::routes::auth::ft_refresh))
         .route("/logout", post(crate::routes::auth::ft_logout))
+        .route("/offers", get(crate::routes::offers::list_offers))
         .layer(CorsLayer::permissive())
         .with_state(app)
 }

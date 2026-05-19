@@ -1,7 +1,7 @@
 use crate::{
     AppState,
     error::AppError,
-    routes::security::{
+    security::{
         jwt::{ft_generate_access_token, ft_generate_refresh_token},
         password,
     },

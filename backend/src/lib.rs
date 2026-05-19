@@ -14,6 +14,7 @@ use tower_http::trace::TraceLayer;
 pub mod error;
 pub mod routes;
 pub mod utils;
+pub mod security;
 
 #[derive(Clone)]
 pub struct AppState {

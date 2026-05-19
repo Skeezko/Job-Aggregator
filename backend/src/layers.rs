@@ -89,8 +89,13 @@ pub fn ft_middleware_layers(cors_origins: Vec<HeaderValue>) -> Router<AppState> 
         ))
         .layer(cors);
 
+    // How to use middleware.rs for auth
+    // let example_route = Router::new().route("/example", get(crate::routes::example::ft_example))
+    // and in example.rs the function should be lked this:  pub async fn ft_example(user: AuthUser)
+
     Router::new()
         .merge(strict_routes)
         .merge(permissive_routes)
+    //  .merge(example_route)
         .layer(middleware_layers)
 }

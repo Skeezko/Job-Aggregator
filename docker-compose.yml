@@ -15,52 +15,6 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-    networks:
-      - internal
-
-  backend:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
-    restart: unless-stopped
-    ports:
-      - "8080:8080"
-    environment:
-      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DATABASE}
-      PEPPER: ${PEPPER}
-      JWT_SECRET: ${JWT_SECRET}
-      INTERNAL_SECRET: ${INTERNAL_SECRET}
-      AI_WORKER_URL: http://ai-worker:8000
-      RUST_LOG: ${RUST_LOG}
-      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS}
-    depends_on:
-      db:
-        condition: service_healthy
-    networks:
-      - internal
-      - public
-
-  ai-worker:
-    build:
-      context: ./ai-worker
-      dockerfile: Dockerfile
-    restart: unless-stopped
-    environment:
-      API_KEY: ${WLD_API_KEY}
-      DB_HOST: db
-      DB_PORT: 5432
-      DB_NAME: ${POSTGRES_DATABASE}
-      DB_USER: ${POSTGRES_USER}
-      DB_PASSWORD: ${POSTGRES_PASSWORD}
-      INTERNAL_SECRET: ${INTERNAL_SECRET}
-    volumes:
-      - ai_data:/app/data
-    depends_on:
-      db:
-        condition: service_healthy
-    networks:
-      - internal
-
   frontend:
     build:
       context: ./frontend
@@ -75,6 +29,7 @@ services:
       - backend
     networks:
       - public
+
 
 volumes:
   postgres_data:

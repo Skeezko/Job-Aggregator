@@ -37,5 +37,7 @@ pub fn ft_check_password(
 
     let parsed_hash = PasswordHash::new(&hashed_password)
         .map_err(|e| AppError::Hash(format!("Invalid hash format: {}", e)))?;
-    Ok(Argon2::default().verify_password(&peppered_password, &parsed_hash).is_ok())
+    Ok(Argon2::default()
+        .verify_password(&peppered_password, &parsed_hash)
+        .is_ok())
 }

@@ -4,7 +4,8 @@ use crate::{
     routes::security::{
         jwt::{ft_generate_access_token, ft_generate_refresh_token},
         password,
-    }, utils::ip::ft_get_ip,
+    },
+    utils::ip::ft_get_ip,
 };
 use axum::{
     Json,
@@ -168,8 +169,11 @@ pub async fn ft_login(
     let password = user_input.password.clone();
     let pepper = app.pepper.clone();
 
-    let is_valid_password = tokio::task::spawn_blocking(move || password::ft_check_password(hash, password, pepper)).await.map_err(|e| AppError::Internal(anyhow::anyhow!("spawn_blocking join: {}", e)))??;
-    
+    let is_valid_password =
+        tokio::task::spawn_blocking(move || password::ft_check_password(hash, password, pepper))
+            .await
+            .map_err(|e| AppError::Internal(anyhow::anyhow!("spawn_blocking join: {}", e)))??;
+
     if !is_valid_password {
         tracing::warn!(ip = %raw_ip, user_id = %user.id, email = %lowercased_email, "Invalid password");
         return Err(AppError::InvalidCredentials);

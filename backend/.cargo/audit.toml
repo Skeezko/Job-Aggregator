@@ -1,0 +1,8 @@
+[advisories]
+ignore = [
+    "RUSTSEC-2023-0071",
+    # Reason: vulnerability is in `rsa` crate, pulled in by sqlx-mysql.
+    # We only use the Postgres driver — MySQL code paths are never
+    # executed at runtime. Reviewed on 2026-04-29 by Hesham.
+    # Re-evaluate if we ever add MySQL as a data source.
+]

@@ -1,41 +1,12 @@
-# Env
 .env
 .env.local
 .env.*.local
-
-# Node
-node_modules/
-frontend/aggregator/node_modules/
-frontend/aggregator/.next/
-frontend/aggregator/.turbo/
-
-# Python
-__pycache__/
-*.py[cod]
-.venv/
-venv/
-.pytest_cache/
-.mypy_cache/
-.ruff_cache/
-
-# Build
-dist/
-build/
-coverage/
-
-# Prisma generated
-frontend/aggregator/node_modules/.prisma/
-
-# OS
-.DS_Store
-Thumbs.db
-
-# IDE
-.idea/
 .vscode/
+.idea/
 *.swp
 *.swo
-
-# Frontend mock data (dev only, jamais en production)
-frontend/aggregator/app/api/
-frontend/aggregator/lib/mock-data.ts
+*~
+.DS_Store
+Thumbs.db
+target/
+jobAggregator-project.pdf

@@ -1,8 +1,5 @@
 # ADR 0002: Use sqlx over ORMs (Diesel/Prisma)
 
-## Status
-Accepted
-
 ## Context
 We need a way to interact with our PostgreSQL database. We evaluated heavy ORMs like Diesel or Prisma Client Rust versus the lightweight async query builder `sqlx`.
 

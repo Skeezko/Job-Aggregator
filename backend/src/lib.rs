@@ -1,11 +1,14 @@
-use axum::{Router, routing::post};
+use axum::Router;
+use axum::http::HeaderValue;
 use secrecy::Secret;
 use sqlx::PgPool;
 use std::sync::Arc;
-use tower_http::cors::CorsLayer;
 
 pub mod error;
+pub mod layers;
 pub mod routes;
+pub mod security;
+pub mod utils;
 
 #[derive(Clone)]
 pub struct AppState {
@@ -14,12 +17,6 @@ pub struct AppState {
     pub jwt_secret: Arc<Secret<String>>,
 }
 
-pub fn ft_app(app: AppState) -> Router {
-    Router::new()
-        .route("/register", post(crate::routes::auth::ft_register))
-        .route("/login", post(crate::routes::auth::ft_login))
-        .route("/refresh", post(crate::routes::auth::ft_refresh))
-        .route("/logout", post(crate::routes::auth::ft_logout))
-        .layer(CorsLayer::permissive())
-        .with_state(app)
+pub fn ft_app(app: AppState, cors_origins: Vec<HeaderValue>) -> Router {
+    layers::ft_middleware_layers(cors_origins).with_state(app)
 }

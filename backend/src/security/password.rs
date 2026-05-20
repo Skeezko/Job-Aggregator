@@ -29,7 +29,7 @@ pub fn ft_check_password(
     hashed_password: String,
     password: String,
     pepper: Arc<Secret<String>>,
-) -> Result<(), AppError> {
+) -> Result<bool, AppError> {
     let mut mac = HmacSha256::new_from_slice(&pepper.expose_secret().as_bytes())
         .map_err(|e| AppError::Hash(format!("HMAC init failed: {}", e)))?;
     mac.update(password.as_bytes());
@@ -37,7 +37,7 @@ pub fn ft_check_password(
 
     let parsed_hash = PasswordHash::new(&hashed_password)
         .map_err(|e| AppError::Hash(format!("Invalid hash format: {}", e)))?;
-    Argon2::default()
+    Ok(Argon2::default()
         .verify_password(&peppered_password, &parsed_hash)
-        .map_err(|_| AppError::InvalidCredentials)
+        .is_ok())
 }

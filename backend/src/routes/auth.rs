@@ -1,10 +1,11 @@
 use crate::{
     AppState,
     error::AppError,
-    routes::security::{
+    security::{
         jwt::{ft_generate_access_token, ft_generate_refresh_token},
         password,
     },
+    utils::ip::ft_get_ip,
 };
 use axum::{
     Json,
@@ -57,6 +58,8 @@ pub struct AuthResponse {
 
 pub async fn ft_register(
     State(app): State<AppState>,
+    ConnectInfo(addr): ConnectInfo<SocketAddr>,
+    headers: HeaderMap,
     Json(user_data): Json<RegisterForm>,
 ) -> Result<impl IntoResponse, AppError> {
     user_data
@@ -101,6 +104,8 @@ pub async fn ft_register(
             .await
             .map_err(|e| AppError::Internal(anyhow::anyhow!("spawn_blocking join: {}", e)))??;
 
+    let raw_ip = ft_get_ip(&headers, addr);
+
     let result = sqlx::query!(
         "INSERT INTO users (email, password_hash, firstname, lastname) VALUES ($1, $2, $3, $4)",
         lowercased_email,
@@ -114,7 +119,7 @@ pub async fn ft_register(
     match result {
         Ok(_) => {}
         Err(sqlx::Error::Database(dbe)) if dbe.constraint() == Some("users_email_key") => {
-            tracing::info!(email = %lowercased_email, "Register attempt with existing email");
+            tracing::info!(ip = %raw_ip, email = %lowercased_email, "Register attempt with existing email");
         }
         Err(e) => return Err(AppError::Database(e)),
     }
@@ -140,6 +145,9 @@ pub async fn ft_login(
     .fetch_optional(&app.db)
     .await?;
 
+    let raw_ip = ft_get_ip(&headers, addr);
+    let ip = IpNetwork::from(raw_ip);
+
     let user = match find_user {
         Some(usr) => usr,
         None => {
@@ -152,6 +160,7 @@ pub async fn ft_login(
             })
             .await
             .ok();
+            tracing::warn!(ip = %raw_ip, email = %lowercased_email, "User not found");
             return Err(AppError::InvalidCredentials);
         }
     };
@@ -160,9 +169,15 @@ pub async fn ft_login(
     let password = user_input.password.clone();
     let pepper = app.pepper.clone();
 
-    tokio::task::spawn_blocking(move || password::ft_check_password(hash, password, pepper))
-        .await
-        .map_err(|e| AppError::Internal(anyhow::anyhow!("spawn_blocking join: {}", e)))??;
+    let is_valid_password =
+        tokio::task::spawn_blocking(move || password::ft_check_password(hash, password, pepper))
+            .await
+            .map_err(|e| AppError::Internal(anyhow::anyhow!("spawn_blocking join: {}", e)))??;
+
+    if !is_valid_password {
+        tracing::warn!(ip = %raw_ip, user_id = %user.id, email = %lowercased_email, "Invalid password");
+        return Err(AppError::InvalidCredentials);
+    }
 
     let access_token = ft_generate_access_token(&app.jwt_secret, user.id, user.role)?;
     let refresh_tokens = ft_generate_refresh_token();
@@ -171,7 +186,6 @@ pub async fn ft_login(
         .get("user-agent")
         .and_then(|v| v.to_str().ok())
         .map(String::from);
-    let ip = IpNetwork::from(addr.ip());
 
     sqlx::query!("INSERT INTO refresh_tokens (user_id, token_hash, device_info, ip_address, expires_at) VALUES ($1, $2, $3, $4, $5)", user.id, refresh_tokens.1, user_agent, ip, expires_at)
     .execute(&app.db).await?;
@@ -199,11 +213,16 @@ pub async fn ft_refresh(
     headers: HeaderMap,
     jar: CookieJar,
 ) -> Result<impl IntoResponse, AppError> {
-    let refresh_token = jar
-        .get("refresh_token")
-        .ok_or(AppError::Unauthorized)?
-        .value()
-        .to_string();
+    let raw_ip = ft_get_ip(&headers, addr);
+    let ip = IpNetwork::from(raw_ip);
+
+    let refresh_token = match jar.get("refresh_token") {
+        Some(cookie) => cookie.value().to_string(),
+        None => {
+            tracing::warn!(ip = %raw_ip, "Refresh attempt without cookie");
+            return Err(AppError::Unauthorized);
+        }
+    };
 
     let encoded_token = hex::encode(Sha256::digest(refresh_token.as_bytes()));
 
@@ -221,12 +240,17 @@ pub async fn ft_refresh(
         )
         .execute(&app.db)
         .await?;
-        tracing::warn!(user_id = %reused.user_id, "Refresh token reused, all sessions revoked");
+        tracing::warn!(ip = %raw_ip, user_id = %reused.user_id, "Refresh token reused, all sessions revoked");
         return Err(AppError::TokenReused);
     }
 
-    let current_token = sqlx::query!(r#"SELECT refresh_tokens.user_id, refresh_tokens.expires_at, users.role as "role: UserRole" FROM refresh_tokens INNER JOIN users ON refresh_tokens.user_id = users.id WHERE refresh_tokens.token_hash = $1 AND refresh_tokens.revoked_at IS NULL AND refresh_tokens.expires_at > NOW()"#, encoded_token)
-    .fetch_optional(&app.db).await?.ok_or(AppError::Unauthorized)?;
+    let current_token = match sqlx::query!(r#"SELECT refresh_tokens.user_id, refresh_tokens.expires_at, users.role as "role: UserRole" FROM refresh_tokens INNER JOIN users ON refresh_tokens.user_id = users.id WHERE refresh_tokens.token_hash = $1 AND refresh_tokens.revoked_at IS NULL AND refresh_tokens.expires_at > NOW()"#, encoded_token).fetch_optional(&app.db).await? {
+        Some(tkn) => tkn,
+        None => {
+            tracing::warn!(ip = %raw_ip, "Refresh with invalid or expired token");
+            return Err(AppError::Unauthorized);
+        }
+    };
 
     sqlx::query!(
         "UPDATE refresh_tokens SET revoked_at = NOW() WHERE token_hash = $1",
@@ -243,7 +267,6 @@ pub async fn ft_refresh(
         .get("user-agent")
         .and_then(|v| v.to_str().ok())
         .map(String::from);
-    let ip = IpNetwork::from(addr.ip());
 
     sqlx::query!("INSERT INTO refresh_tokens (user_id, token_hash, device_info, ip_address, expires_at) VALUES ($1, $2, $3, $4, $5)", current_token.user_id, refresh_tokens.1, user_agent, ip, expires_at)
     .execute(&app.db).await?;
@@ -268,12 +291,18 @@ pub async fn ft_refresh(
 pub async fn ft_logout(
     State(app): State<AppState>,
     jar: CookieJar,
+    ConnectInfo(addr): ConnectInfo<SocketAddr>,
+    headers: HeaderMap,
 ) -> Result<impl IntoResponse, AppError> {
-    let refresh_token = jar
-        .get("refresh_token")
-        .ok_or(AppError::Unauthorized)?
-        .value()
-        .to_string();
+    let raw_ip = ft_get_ip(&headers, addr);
+
+    let refresh_token = match jar.get("refresh_token") {
+        Some(cookie) => cookie.value().to_string(),
+        None => {
+            tracing::warn!(ip = %raw_ip, "Logout attempt without cookie");
+            return Err(AppError::Unauthorized);
+        }
+    };
 
     let encoded_token = hex::encode(Sha256::digest(refresh_token.as_bytes()));
 

@@ -7,6 +7,7 @@ use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
 use uuid::Uuid;
 use crate::security::jwt::Claims;
+use crate::AppState;
 
 #[derive(Deserialize)]
 pub struct SaveOfferPayload {
@@ -23,12 +24,12 @@ pub struct SavedOfferResponse {
 }
 
 pub async fn save_offer(
-    State(pool): State<PgPool>,
+    State(app_state): State<AppState>,
     Extension(claims): Extension<Claims>, 
     Path(offer_id): Path<Uuid>,
     Json(payload): Json<SaveOfferPayload>,
 ) -> Result<StatusCode, (StatusCode, String)> {
-    
+    let pool = app_state.db;
     let result = sqlx::query!(
         r#"
         INSERT INTO saved_offers (user_id, offer_id, notes)
@@ -53,10 +54,11 @@ pub async fn save_offer(
 }
 
 pub async fn get_saved_offers(
-    State(pool): State<PgPool>,
+    State(app_state): State<AppState>,
     Extension(claims): Extension<Claims>,
 ) -> Result<Json<Vec<SavedOfferResponse>>, (StatusCode, String)> {
-    
+    let pool = app_state.db;
+
     let saved_offers = sqlx::query_as::<_, SavedOfferResponse>(
         r#"
         SELECT s.offer_id, o.title, o.company, s.notes, s.saved_at
@@ -75,11 +77,12 @@ pub async fn get_saved_offers(
 }
 
 pub async fn remove_saved_offer(
-    State(pool): State<PgPool>,
+    State(app_state): State<AppState>,
     Extension(claims): Extension<Claims>,
     Path(offer_id): Path<Uuid>,
 ) -> Result<StatusCode, (StatusCode, String)> {
-    
+    let pool = app_state.db;
+
     sqlx::query!(
         "DELETE FROM saved_offers WHERE user_id = $1 AND offer_id = $2",
         claims.sub,

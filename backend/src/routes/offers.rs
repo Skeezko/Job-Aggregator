@@ -10,6 +10,8 @@ use uuid::Uuid;
 use crate::models::offer::{ContractType, RemotePolicy};
 use crate::models::pagination::Pagination;
 
+use crate::AppState;
+
 #[derive(Deserialize)]
 pub struct OfferFilters {
     pub contract_type: Option<ContractType>,
@@ -28,11 +30,13 @@ pub struct OfferListItem {
 }
 
 pub async fn list_offers(
-    State(pool): State<PgPool>,
+    State(app_state): State<AppState>,
     Query(filters): Query<OfferFilters>,
     Query(pagination): Query<Pagination>,
 ) -> Result<Json<Vec<OfferListItem>>, (StatusCode, String)> {
     
+    let pool = app_state.db;
+
     let mut query: QueryBuilder<Postgres> = QueryBuilder::new(
         "SELECT id, title, company, location_city, contract_type, remote_policy FROM offers WHERE is_active = TRUE "
     );

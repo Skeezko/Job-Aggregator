@@ -39,3 +39,7 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Mock API — dev only, never push
+/app/api/
+/lib/mock-data.ts

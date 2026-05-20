@@ -35,3 +35,7 @@ Thumbs.db
 .vscode/
 *.swp
 *.swo
+
+# Frontend mock data (dev only, jamais en production)
+frontend/aggregator/app/api/
+frontend/aggregator/lib/mock-data.ts

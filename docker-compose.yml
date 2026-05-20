@@ -7,7 +7,7 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DATABASE}
     ports:
-      - "5432:5432"
+      - "5434:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -15,26 +15,25 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-  frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-    restart: unless-stopped
-    ports:
-      - "3000:3000"
-    environment:
-      API_URL: http://backend:8080
-      NODE_ENV: production
-    depends_on:
-      - backend
-    networks:
-      - public
 
+  ai-worker:
+    build:
+      context: ./ai-worker
+    environment:
+      API_KEY: ${API_KEY}
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_NAME: ${POSTGRES_DATABASE}
+      DB_USER: ${POSTGRES_USER}
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - ai_data:/root/.cache/huggingface
+      - ./ai-worker/data:/app/data
+    depends_on:
+      db:
+        condition: service_healthy
+    profiles: ["jobs"]
 
 volumes:
   postgres_data:
   ai_data:
-
-networks:
-  internal:
-  public:

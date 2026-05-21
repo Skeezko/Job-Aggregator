@@ -4,6 +4,7 @@
 .env
 .env.*
 !.env.example
+jobAggregator-project.pdf
 
 # Node
 node_modules
@@ -24,7 +25,12 @@ dist
 build
 coverage
 
+# Backend
+target/
+tests/
+
 # Docs
-docs
+docs/
 README.md
 CONTRIBUTING.md
+*.md

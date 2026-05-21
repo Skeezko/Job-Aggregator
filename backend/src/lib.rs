@@ -1,4 +1,4 @@
-use axum::{Router, routing::{get, post, delete}};
+use axum::Router;
 use secrecy::Secret;
 use sqlx::PgPool;
 use std::sync::Arc;

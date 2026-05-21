@@ -47,6 +47,7 @@ pub struct LoginForm {
 
 #[derive(Debug, Clone, Type, PartialEq, Serialize, Deserialize)]
 #[sqlx(type_name = "user_role", rename_all = "lowercase")]
+#[serde(rename_all = "lowercase")]
 pub enum UserRole {
     Admin,
     User,
@@ -55,6 +56,12 @@ pub enum UserRole {
 #[derive(Serialize)]
 pub struct AuthResponse {
     pub access_token: String,
+}
+
+#[derive(Serialize)]
+pub struct MeResponse {
+    pub id: uuid::Uuid,
+    pub role: UserRole,
 }
 
 pub async fn ft_register(
@@ -334,9 +341,8 @@ pub async fn ft_logout(
 pub async fn ft_me(
     user: AuthUser,
 ) -> Result<Json<MeResponse>, StatusCode> {
-    
     Ok(Json(MeResponse {
         id: user.id,
-        role: format!("{:?}", user.role),
+        role: user.role,
     }))
 }

@@ -4,6 +4,15 @@ from .backbone import encode
 from ..etl.load import get_conn
 
 
+def _parse_vector(value):
+    """pgvector is returned as a textual '[x,y,...]'; parse to np.float32 array."""
+    if value is None:
+        return None
+    if isinstance(value, str):
+        return np.fromstring(value.strip("[]"), sep=",", dtype=np.float32)
+    return np.asarray(value, dtype=np.float32)
+
+
 def score_user_offer(offer_id, skills, desired_role=None):
     with get_conn() as conn:
         with conn.cursor() as cur:
@@ -17,7 +26,7 @@ def score_user_offer(offer_id, skills, desired_role=None):
         return {"offer_id": str(offer_id), "score": 0, "matched_skills": []}
 
     offer_vec, title = row
-    offer_vec = np.array(offer_vec, dtype=np.float32)
+    offer_vec = _parse_vector(offer_vec)
 
     query = f"{desired_role or ''} skills: {', '.join(skills)}"
     user_vec = encode([query])[0]

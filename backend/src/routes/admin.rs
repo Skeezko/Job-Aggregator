@@ -5,7 +5,6 @@ use axum::{
 };
 use chrono::{DateTime, Utc};
 use serde::Serialize;
-use sqlx::PgPool;
 use uuid::Uuid;
 
 use crate::AppState;

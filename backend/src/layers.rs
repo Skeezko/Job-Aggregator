@@ -1,7 +1,7 @@
 use crate::AppState;
 use axum::http::StatusCode;
 use axum::http::{HeaderName, HeaderValue, Method, Request, header};
-use axum::{Router, routing::get, routing::post, routing::patch, routing::delete};
+use axum::Router;
 use std::time::Duration;
 use tower::ServiceBuilder;
 use tower_governor::key_extractor::SmartIpKeyExtractor;
@@ -37,13 +37,13 @@ pub fn ft_middleware_layers(cors_origins: Vec<HeaderValue>) -> Router<AppState> 
         .unwrap();
 
     let strict_routes = Router::new()
-        .route("/register", post(crate::routes::auth::ft_register))
-        .route("/login", post(crate::routes::auth::ft_login))
+        .route("/register", axum::routing::post(crate::routes::auth::ft_register))
+        .route("/login", axum::routing::post(crate::routes::auth::ft_login))
         .layer(GovernorLayer::new(governor_auth_conf));
 
     let permissive_routes = Router::new()
-        .route("/refresh", post(crate::routes::auth::ft_refresh))
-        .route("/logout", post(crate::routes::auth::ft_logout))
+        .route("/refresh", axum::routing::post(crate::routes::auth::ft_refresh))
+        .route("/logout", axum::routing::post(crate::routes::auth::ft_logout))
         .layer(GovernorLayer::new(governor_conf));
 
     let middleware_layers = ServiceBuilder::new()
@@ -94,12 +94,12 @@ pub fn ft_middleware_layers(cors_origins: Vec<HeaderValue>) -> Router<AppState> 
     // and in example.rs the function should be lked this:  pub async fn ft_example(user: AuthUser)
     let api_routes = Router::new()
         .route("/offers", axum::routing::get(crate::routes::offers::list_offers))
-        .route("/offers/:offer_id/save", axum::routing::post(crate::routes::users::save_offer))
+        .route("/offers/{offer_id}/save", axum::routing::post(crate::routes::users::save_offer))
         .route("/users/saved-offers", axum::routing::get(crate::routes::users::get_saved_offers))
-        .route("/users/saved-offers/:offer_id", axum::routing::delete(crate::routes::users::remove_saved_offer))
-        .route("/admin/offers/:offer_id/disable", axum::routing::patch(crate::routes::admin::disable_offer))
+        .route("/users/saved-offers/{offer_id}", axum::routing::delete(crate::routes::users::remove_saved_offer))
+        .route("/admin/offers/{offer_id}/disable", axum::routing::patch(crate::routes::admin::disable_offer))
         .route("/admin/users", axum::routing::get(crate::routes::admin::list_users))
-        .route("/auth/me", axum::routing::get(crate::routes::auth::ft_me))
+        .route("/auth/me", axum::routing::get(crate::routes::auth::ft_me));
 
     Router::new()
         .merge(strict_routes)

@@ -25,7 +25,7 @@ UPSERT_SQL = """
 INSERT INTO offers (
     source, source_id, title, description, company,
     location_city, location_country, remote_policy, contract_type,
-    salary_min, salary_max, salary_currency, posted_at, raw
+    salary_min, salary_max, salary_currency, posted_at, embedding, raw
 ) VALUES %s
 ON CONFLICT (source, source_id) DO UPDATE SET
     title = EXCLUDED.title,
@@ -39,6 +39,7 @@ ON CONFLICT (source, source_id) DO UPDATE SET
     salary_max = EXCLUDED.salary_max,
     salary_currency = EXCLUDED.salary_currency,
     posted_at = EXCLUDED.posted_at,
+    embedding = COALESCE(EXCLUDED.embedding, offers.embedding),
     raw = EXCLUDED.raw,
     updated_at = NOW()
 RETURNING (xmax = 0) AS inserted;
@@ -65,6 +66,7 @@ def upsert_offers(offers):
             o.salary_max,
             o.salary_currency,
             o.posted_at,
+            _to_vector(o.embedding),
             Json(o.raw),
         )
         for o in offers

@@ -5,6 +5,7 @@ use chrono::{DateTime, Utc};
 
 #[derive(Type, Serialize, Deserialize, Debug, Clone, PartialEq)]
 #[sqlx(type_name = "contract_type", rename_all = "snake_case")]
+#[serde(rename_all = "snake_case")]
 pub enum ContractType {
     Internship,
     Apprenticeship,
@@ -15,6 +16,7 @@ pub enum ContractType {
 
 #[derive(Type, Serialize, Deserialize, Debug, Clone, PartialEq)]
 #[sqlx(type_name = "remote_policy", rename_all = "lowercase")]
+#[serde(rename_all = "lowercase")]
 pub enum RemotePolicy {
     Onsite,
     Hybrid,

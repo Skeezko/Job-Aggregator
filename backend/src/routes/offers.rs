@@ -11,7 +11,7 @@ use crate::models::offer::{ContractType, RemotePolicy};
 use crate::models::pagination::Pagination;
 
 use crate::AppState;
-
+use crate::security::middleware::AuthUser;
 #[derive(Deserialize)]
 pub struct OfferFilters {
     pub contract_type: Option<ContractType>,
@@ -31,6 +31,7 @@ pub struct OfferListItem {
 
 pub async fn list_offers(
     State(app_state): State<AppState>,
+    _user: AuthUser,
     Query(filters): Query<OfferFilters>,
     Query(pagination): Query<Pagination>,
 ) -> Result<Json<Vec<OfferListItem>>, (StatusCode, String)> {

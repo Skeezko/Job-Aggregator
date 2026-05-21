@@ -1,13 +1,14 @@
 use axum::{
-    extract::{Path, State, Extension},
+    extract::{Path, State},
     http::StatusCode,
     Json,
 };
 use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
 use uuid::Uuid;
-use crate::security::jwt::Claims;
+
 use crate::AppState;
+use crate::security::middleware::AuthUser;
 
 #[derive(Deserialize)]
 pub struct SaveOfferPayload {
@@ -25,11 +26,13 @@ pub struct SavedOfferResponse {
 
 pub async fn save_offer(
     State(app_state): State<AppState>,
-    Extension(claims): Extension<Claims>, 
+    user: AuthUser,
     Path(offer_id): Path<Uuid>,
     Json(payload): Json<SaveOfferPayload>,
 ) -> Result<StatusCode, (StatusCode, String)> {
+    
     let pool = app_state.db;
+
     let result = sqlx::query!(
         r#"
         INSERT INTO saved_offers (user_id, offer_id, notes)
@@ -37,7 +40,7 @@ pub async fn save_offer(
         ON CONFLICT (user_id, offer_id) 
         DO UPDATE SET notes = EXCLUDED.notes, saved_at = NOW()
         "#,
-        claims.sub,
+        user.id,
         offer_id,
         payload.notes
     )
@@ -46,17 +49,15 @@ pub async fn save_offer(
 
     match result {
         Ok(_) => Ok(StatusCode::CREATED),
-        Err(e) => Err((
-            StatusCode::INTERNAL_SERVER_ERROR,
-            format!("Erreur lors de la sauvegarde : {}", e),
-        )),
+        Err(e) => Err((StatusCode::INTERNAL_SERVER_ERROR, e.to_string())),
     }
 }
 
 pub async fn get_saved_offers(
     State(app_state): State<AppState>,
-    Extension(claims): Extension<Claims>,
+    user: AuthUser,
 ) -> Result<Json<Vec<SavedOfferResponse>>, (StatusCode, String)> {
+    
     let pool = app_state.db;
 
     let saved_offers = sqlx::query_as::<_, SavedOfferResponse>(
@@ -68,7 +69,7 @@ pub async fn get_saved_offers(
         ORDER BY s.saved_at DESC
         "#
     )
-    .bind(claims.sub)
+    .bind(user.id)
     .fetch_all(&pool)
     .await
     .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
@@ -78,14 +79,15 @@ pub async fn get_saved_offers(
 
 pub async fn remove_saved_offer(
     State(app_state): State<AppState>,
-    Extension(claims): Extension<Claims>,
+    user: AuthUser,
     Path(offer_id): Path<Uuid>,
 ) -> Result<StatusCode, (StatusCode, String)> {
+    
     let pool = app_state.db;
 
     sqlx::query!(
         "DELETE FROM saved_offers WHERE user_id = $1 AND offer_id = $2",
-        claims.sub,
+        user.id,
         offer_id
     )
     .execute(&pool)

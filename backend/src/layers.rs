@@ -1,7 +1,7 @@
 use crate::AppState;
 use axum::http::StatusCode;
 use axum::http::{HeaderName, HeaderValue, Method, Request, header};
-use axum::{Router, routing::post};
+use axum::{Router, routing::get, routing::post, routing::patch, routing::delete};
 use std::time::Duration;
 use tower::ServiceBuilder;
 use tower_governor::key_extractor::SmartIpKeyExtractor;
@@ -94,11 +94,12 @@ pub fn ft_middleware_layers(cors_origins: Vec<HeaderValue>) -> Router<AppState> 
     // and in example.rs the function should be lked this:  pub async fn ft_example(user: AuthUser)
     let api_routes = Router::new()
         .route("/offers", axum::routing::get(crate::routes::offers::list_offers))
-        .route("/offers/:offer_id/save", post(crate::routes::users::save_offer))
+        .route("/offers/:offer_id/save", axum::routing::post(crate::routes::users::save_offer))
         .route("/users/saved-offers", axum::routing::get(crate::routes::users::get_saved_offers))
         .route("/users/saved-offers/:offer_id", axum::routing::delete(crate::routes::users::remove_saved_offer))
         .route("/admin/offers/:offer_id/disable", axum::routing::patch(crate::routes::admin::disable_offer))
-        .route("/admin/users", axum::routing::get(crate::routes::admin::list_users));
+        .route("/admin/users", axum::routing::get(crate::routes::admin::list_users))
+        .route("/auth/me", axum::routing::get(crate::routes::auth::ft_me))
 
     Router::new()
         .merge(strict_routes)

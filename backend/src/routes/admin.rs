@@ -1,5 +1,5 @@
 use axum::{
-    extract::{Extension, Path, State},
+    extract::{Path, State},
     http::StatusCode,
     Json,
 };
@@ -8,10 +8,9 @@ use serde::Serialize;
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use crate::security::jwt::Claims;
-use crate::routes::auth::UserRole;
-
 use crate::AppState;
+use crate::routes::auth::UserRole;
+use crate::security::middleware::AuthUser;
 
 #[derive(Serialize, sqlx::FromRow)]
 pub struct UserResponse {
@@ -23,22 +22,17 @@ pub struct UserResponse {
     pub created_at: DateTime<Utc>,
 }
 
-
-// la passer en is_active = FALSE)
 pub async fn disable_offer(
     State(app_state): State<AppState>,
-    Extension(claims): Extension<Claims>,
+    user: AuthUser,
     Path(offer_id): Path<Uuid>,
 ) -> Result<StatusCode, (StatusCode, String)> {
     
-    let pool = app_state.db;
-
-    if claims.role != UserRole::Admin {
-        return Err((
-            StatusCode::FORBIDDEN,
-            "Accès refusé : Action réservée aux administrateurs".to_string(),
-        ));
+    if user.role != UserRole::Admin {
+        return Err((StatusCode::FORBIDDEN, "Accès réservé aux administrateurs".to_string()));
     }
+
+    let pool = app_state.db;
 
     let result = sqlx::query!(
         "UPDATE offers SET is_active = FALSE WHERE id = $1",
@@ -57,24 +51,17 @@ pub async fn disable_offer(
 
 pub async fn list_users(
     State(app_state): State<AppState>,
-    Extension(claims): Extension<Claims>,
+    user: AuthUser,
 ) -> Result<Json<Vec<UserResponse>>, (StatusCode, String)> {
     
-    let pool = app_state.db;
-
-    if claims.role != UserRole::Admin {
-        return Err((
-            StatusCode::FORBIDDEN,
-            "Accès refusé : Action réservée aux administrateurs".to_string(),
-        ));
+    if user.role != UserRole::Admin {
+        return Err((StatusCode::FORBIDDEN, "Accès réservé aux administrateurs".to_string()));
     }
 
+    let pool = app_state.db;
+
     let users = sqlx::query_as::<_, UserResponse>(
-        r#"
-        SELECT id, email, firstname, lastname, role, created_at 
-        FROM users 
-        ORDER BY created_at DESC
-        "#
+        "SELECT id, email, firstname, lastname, role, created_at FROM users ORDER BY created_at DESC"
     )
     .fetch_all(&pool)
     .await

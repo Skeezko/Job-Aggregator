@@ -22,6 +22,7 @@ use sqlx::{Type, types::ipnetwork::IpNetwork};
 use std::net::SocketAddr;
 use validator::Validate;
 use zxcvbn::{Score, zxcvbn};
+use crate::security::middleware::AuthUser;
 
 #[derive(Debug, Deserialize, Validate)]
 pub struct RegisterForm {
@@ -328,4 +329,14 @@ pub async fn ft_logout(
     );
 
     Ok(response)
+}
+
+pub async fn ft_me(
+    user: AuthUser,
+) -> Result<Json<MeResponse>, StatusCode> {
+    
+    Ok(Json(MeResponse {
+        id: user.id,
+        role: format!("{:?}", user.role),
+    }))
 }

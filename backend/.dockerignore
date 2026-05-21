@@ -4,11 +4,8 @@ target/
 .env
 .env.local
 .env.*.local
-Dockerfile
-.dockerignore
 README.md
 *.md
-docs/
 tests/
 .vscode/
 .idea/

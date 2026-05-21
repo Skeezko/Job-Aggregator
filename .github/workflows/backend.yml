@@ -1,0 +1,67 @@
+name: backend
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "backend/**"
+      - ".github/workflows/backend.yml"
+  pull_request:
+    paths:
+      - "backend/**"
+      - ".github/workflows/backend.yml"
+
+concurrency:
+  group: backend-ci
+  cancel-in-progress: false
+
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+    env:
+      PG_CONTAINER: ci-postgres-${{ github.run_id }}
+      DATABASE_URL: postgres://ci:ci@127.0.0.1:5544/ci
+      SQLX_OFFLINE: "true"
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: backend
+          shared-key: backend-ci
+
+      - name: Start Postgres
+        run: |
+          docker rm -f "$PG_CONTAINER" 2>/dev/null || true
+          docker run -d --name "$PG_CONTAINER" \
+            -e POSTGRES_USER=ci -e POSTGRES_PASSWORD=ci -e POSTGRES_DB=ci \
+            -p 5544:5432 pgvector/pgvector:pg18
+          for i in $(seq 1 30); do
+            docker exec "$PG_CONTAINER" pg_isready -U ci -d ci && break
+            sleep 2
+          done
+
+      - name: Apply migrations
+        run: |
+          for f in migrations/*.sql; do
+            docker exec -i "$PG_CONTAINER" psql -U ci -d ci -v ON_ERROR_STOP=1 < "$f"
+          done
+
+      - name: Format check
+        run: cargo fmt --all -- --check
+
+      - name: Clippy
+        run: cargo clippy --all-targets
+
+      - name: Build
+        run: cargo build --verbose
+
+      - name: Test
+        run: cargo test --verbose
+
+      - name: Stop Postgres
+        if: always()
+        run: docker rm -f "$PG_CONTAINER" || true

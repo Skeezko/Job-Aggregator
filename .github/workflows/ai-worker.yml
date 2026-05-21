@@ -1,0 +1,36 @@
+name: ai-worker
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "ai-worker/**"
+      - ".github/workflows/ai-worker.yml"
+  pull_request:
+    paths:
+      - "ai-worker/**"
+      - ".github/workflows/ai-worker.yml"
+
+jobs:
+  lint-test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ai-worker
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup virtual env
+        run: |
+          python3 -m venv .venv
+          .venv/bin/pip install --upgrade pip
+          .venv/bin/pip install -r requirements.txt
+          .venv/bin/pip install ruff pytest
+
+      - name: Lint
+        run: .venv/bin/ruff check src/ tests/
+
+      - name: Test
+        env:
+          PYTHONPATH: .
+        run: .venv/bin/pytest tests/

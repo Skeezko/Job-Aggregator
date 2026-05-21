@@ -4,6 +4,13 @@ import psycopg2
 from psycopg2.extras import Json, execute_values
 
 
+def _to_vector(values):
+    """Render a list of floats in pgvector text format, or None."""
+    if values is None:
+        return None
+    return "[" + ",".join(f"{float(v)}" for v in values) + "]"
+
+
 def get_conn():
     return psycopg2.connect(
         host=os.getenv("DB_HOST", "localhost"),

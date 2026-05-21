@@ -1,0 +1,44 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT refresh_tokens.user_id, refresh_tokens.expires_at, users.role as \"role: UserRole\" FROM refresh_tokens INNER JOIN users ON refresh_tokens.user_id = users.id WHERE refresh_tokens.token_hash = $1 AND refresh_tokens.revoked_at IS NULL AND refresh_tokens.expires_at > NOW()",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "user_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "expires_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 2,
+        "name": "role: UserRole",
+        "type_info": {
+          "Custom": {
+            "name": "user_role",
+            "kind": {
+              "Enum": [
+                "user",
+                "admin"
+              ]
+            }
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "540ad255e640c7727f2c75461a627fba582c55b7691030f5b2207f5e119aeaca"
+}

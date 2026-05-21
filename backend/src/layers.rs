@@ -96,6 +96,6 @@ pub fn ft_middleware_layers(cors_origins: Vec<HeaderValue>) -> Router<AppState> 
     Router::new()
         .merge(strict_routes)
         .merge(permissive_routes)
-    //  .merge(example_route)
+        //  .merge(example_route)
         .layer(middleware_layers)
 }

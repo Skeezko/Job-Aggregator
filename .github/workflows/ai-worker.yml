@@ -1,0 +1,41 @@
+name: ai-worker
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "ai-worker/**"
+      - ".github/workflows/ai-worker.yml"
+  pull_request:
+    paths:
+      - "ai-worker/**"
+      - ".github/workflows/ai-worker.yml"
+
+jobs:
+  lint-test:
+    runs-on: self-hosted
+    defaults:
+      run:
+        working-directory: ai-worker
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+          cache-dependency-path: ai-worker/requirements.txt
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install ruff pytest
+
+      - name: Lint
+        run: ruff check src/ tests/
+
+      - name: Test
+        env:
+          PYTHONPATH: .
+        run: pytest tests/

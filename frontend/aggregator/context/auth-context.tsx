@@ -8,20 +8,25 @@ import {
   useState,
 } from "react";
 import * as api from "@/lib/api";
-import type { User } from "@/lib/types";
+import type { Me } from "@/lib/types";
 
 interface AuthState {
-  user: User | null;
+  user: Me | null;
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
-  register: (email: string, password: string, name: string) => Promise<void>;
+  register: (
+    email: string,
+    password: string,
+    firstname: string,
+    lastname: string
+  ) => Promise<void>;
   logout: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthState | null>(null);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<Me | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -40,14 +45,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const login = useCallback(async (email: string, password: string) => {
     const res = await api.login(email, password);
     api.setToken(res.access_token);
-    setUser(res.user);
+    const me = await api.getMe();
+    setUser(me);
   }, []);
 
   const register = useCallback(
-    async (email: string, password: string, name: string) => {
-      const res = await api.register(email, password, name);
+    async (
+      email: string,
+      password: string,
+      firstname: string,
+      lastname: string
+    ) => {
+      // Backend returns 201 with no body; we then log in to get a token.
+      await api.register(email, password, firstname, lastname);
+      const res = await api.login(email, password);
       api.setToken(res.access_token);
-      setUser(res.user);
+      const me = await api.getMe();
+      setUser(me);
     },
     []
   );
@@ -56,7 +70,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       await api.logout();
     } catch {
-      // ignore
+      // ignore — cookie may already be gone
     }
     api.clearToken();
     setUser(null);

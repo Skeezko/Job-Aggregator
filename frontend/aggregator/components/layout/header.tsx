@@ -56,7 +56,7 @@ export function Header() {
           {user ? (
             <>
               <span className="hidden sm:block text-xs text-zinc-500">
-                {user.name ?? user.email}
+                {user.role === "admin" ? "Admin" : "Connecté"}
               </span>
               <button
                 onClick={handleLogout}

@@ -1,18 +1,15 @@
 import type {
-  AdminStats,
-  AuditLog,
-  AuthTokens,
-  Bookmark,
-  DashboardStats,
   LoginResponse,
+  Me,
   Offer,
+  OfferListItem,
   OffersFilter,
-  PaginatedResponse,
+  SavedOffer,
   User,
 } from "./types";
 
 const API_BASE =
-  process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
+  process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
 
 function getToken(): string | null {
   if (typeof window === "undefined") return null;
@@ -38,22 +35,34 @@ async function request<T>(
   };
   if (token) headers["Authorization"] = `Bearer ${token}`;
 
-  const res = await fetch(`${API_BASE}${path}`, { ...options, headers });
+  // credentials: include so the HttpOnly refresh_token cookie is sent on
+  // /refresh and /logout, and so CORS allow-credentials is honoured.
+  const res = await fetch(`${API_BASE}${path}`, {
+    ...options,
+    headers,
+    credentials: "include",
+  });
 
   if (!res.ok) {
     let message = res.statusText;
+    let code: string | undefined;
     try {
       const body = await res.json();
-      message = body.message ?? message;
+      message = body?.error?.message ?? body?.message ?? message;
+      code = body?.error?.code;
     } catch {
-      // ignore
+      // body wasn't JSON
     }
-    const err = new Error(message) as Error & { status: number };
+    const err = new Error(message) as Error & { status: number; code?: string };
     err.status = res.status;
+    err.code = code;
     throw err;
   }
 
   if (res.status === 204) return undefined as T;
+  // Some endpoints return plain text (register, logout); guard against that.
+  const ct = res.headers.get("content-type") ?? "";
+  if (!ct.includes("application/json")) return undefined as T;
   return res.json() as Promise<T>;
 }
 
@@ -63,7 +72,7 @@ export async function login(
   email: string,
   password: string
 ): Promise<LoginResponse> {
-  return request<LoginResponse>("/auth/login", {
+  return request<LoginResponse>("/login", {
     method: "POST",
     body: JSON.stringify({ email, password }),
   });
@@ -72,142 +81,73 @@ export async function login(
 export async function register(
   email: string,
   password: string,
-  name: string
-): Promise<LoginResponse> {
-  return request<LoginResponse>("/auth/register", {
+  firstname: string,
+  lastname: string
+): Promise<void> {
+  return request<void>("/register", {
     method: "POST",
-    body: JSON.stringify({ email, password, name }),
+    body: JSON.stringify({ email, password, firstname, lastname }),
   });
 }
 
 export async function logout(): Promise<void> {
-  await request<void>("/auth/logout", { method: "POST" });
+  await request<void>("/logout", { method: "POST" });
 }
 
-export async function refreshToken(): Promise<AuthTokens> {
-  return request<AuthTokens>("/auth/refresh", { method: "POST" });
+export async function refreshToken(): Promise<LoginResponse> {
+  return request<LoginResponse>("/refresh", { method: "POST" });
 }
 
-export async function getMe(): Promise<User> {
-  return request<User>("/auth/me");
+export async function getMe(): Promise<Me> {
+  return request<Me>("/auth/me");
 }
 
 // ─── Offers ─────────────────────────────────────────────────────────────────
 
 export async function getOffers(
   filter: OffersFilter = {}
-): Promise<PaginatedResponse<Offer>> {
+): Promise<OfferListItem[]> {
   const params = new URLSearchParams();
-  if (filter.search) params.set("search", filter.search);
   if (filter.contract_type) params.set("contract_type", filter.contract_type);
-  if (filter.location) params.set("location", filter.location);
-  if (filter.salary_min != null)
-    params.set("salary_min", String(filter.salary_min));
-  if (filter.salary_max != null)
-    params.set("salary_max", String(filter.salary_max));
-  if (filter.ai_category) params.set("ai_category", filter.ai_category);
-  if (filter.status) params.set("status", filter.status);
-  if (filter.page) params.set("page", String(filter.page));
-  if (filter.limit) params.set("limit", String(filter.limit));
+  if (filter.remote_policy) params.set("remote_policy", filter.remote_policy);
+  if (filter.city) params.set("city", filter.city);
+  if (filter.limit != null) params.set("limit", String(filter.limit));
+  if (filter.offset != null) params.set("offset", String(filter.offset));
 
   const qs = params.toString();
-  return request<PaginatedResponse<Offer>>(`/offers${qs ? `?${qs}` : ""}`);
+  return request<OfferListItem[]>(`/offers${qs ? `?${qs}` : ""}`);
 }
 
 export async function getOffer(id: string): Promise<Offer> {
   return request<Offer>(`/offers/${id}`);
 }
 
-// ─── Bookmarks ───────────────────────────────────────────────────────────────
+// ─── Saved offers (a.k.a. bookmarks) ────────────────────────────────────────
 
-export async function getBookmarks(): Promise<Bookmark[]> {
-  return request<Bookmark[]>("/bookmarks");
+export async function getSavedOffers(): Promise<SavedOffer[]> {
+  return request<SavedOffer[]>("/users/saved-offers");
 }
 
-export async function addBookmark(
+export async function saveOffer(
   offerId: string,
-  notes?: string
+  notes?: string | null
 ): Promise<void> {
-  return request<void>(`/bookmarks/${offerId}`, {
+  return request<void>(`/offers/${offerId}/save`, {
     method: "POST",
-    body: JSON.stringify({ notes }),
+    body: JSON.stringify({ notes: notes ?? null }),
   });
 }
 
-export async function removeBookmark(offerId: string): Promise<void> {
-  return request<void>(`/bookmarks/${offerId}`, { method: "DELETE" });
+export async function removeSavedOffer(offerId: string): Promise<void> {
+  return request<void>(`/users/saved-offers/${offerId}`, { method: "DELETE" });
 }
 
-export async function updateBookmarkNotes(
-  offerId: string,
-  notes: string
-): Promise<void> {
-  return request<void>(`/bookmarks/${offerId}`, {
-    method: "PATCH",
-    body: JSON.stringify({ notes }),
-  });
+// ─── Admin ──────────────────────────────────────────────────────────────────
+
+export async function listUsers(): Promise<User[]> {
+  return request<User[]>("/admin/users");
 }
 
-// ─── Dashboard ───────────────────────────────────────────────────────────────
-
-export async function getDashboardStats(): Promise<DashboardStats> {
-  return request<DashboardStats>("/dashboard/stats");
-}
-
-// ─── Admin ───────────────────────────────────────────────────────────────────
-
-export async function getAdminStats(): Promise<AdminStats> {
-  return request<AdminStats>("/admin/stats");
-}
-
-export async function getUsers(
-  page = 1,
-  limit = 20
-): Promise<PaginatedResponse<User>> {
-  return request<PaginatedResponse<User>>(
-    `/admin/users?page=${page}&limit=${limit}`
-  );
-}
-
-export async function updateUserRole(
-  userId: string,
-  role: "user" | "admin"
-): Promise<User> {
-  return request<User>(`/admin/users/${userId}/role`, {
-    method: "PATCH",
-    body: JSON.stringify({ role }),
-  });
-}
-
-export async function toggleUserActive(
-  userId: string,
-  is_active: boolean
-): Promise<User> {
-  return request<User>(`/admin/users/${userId}`, {
-    method: "PATCH",
-    body: JSON.stringify({ is_active }),
-  });
-}
-
-export async function moderateOffer(
-  offerId: string,
-  status: "active" | "archived" | "flagged"
-): Promise<Offer> {
-  return request<Offer>(`/admin/offers/${offerId}/status`, {
-    method: "PATCH",
-    body: JSON.stringify({ status }),
-  });
-}
-
-export async function triggerIngestion(): Promise<{ message: string }> {
-  return request<{ message: string }>("/admin/ingest", { method: "POST" });
-}
-
-export async function getAuditLog(
-  page = 1,
-  limit = 20
-): Promise<PaginatedResponse<AuditLog>> {
-  return request<PaginatedResponse<AuditLog>>(
-    `/admin/audit-log?page=${page}&limit=${limit}`
-  );
+export async function disableOffer(offerId: string): Promise<void> {
+  return request<void>(`/admin/offers/${offerId}/disable`, { method: "PATCH" });
 }

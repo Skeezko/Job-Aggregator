@@ -5,7 +5,7 @@ import Link from "next/link";
 import * as api from "@/lib/api";
 import type { Offer } from "@/lib/types";
 import { useAuth } from "@/context/auth-context";
-import { ContractBadge, StatusBadge } from "@/components/ui/badge";
+import { ContractBadge, RemoteBadge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 
 function formatSalary(offer: Offer): string | null {
@@ -17,16 +17,10 @@ function formatSalary(offer: Offer): string | null {
       currency: cur,
       maximumFractionDigits: 0,
     }).format(n);
-  const period =
-    offer.salary_period === "year"
-      ? "/an"
-      : offer.salary_period === "month"
-      ? "/mois"
-      : "";
   if (offer.salary_min != null && offer.salary_max != null)
-    return `${fmt(offer.salary_min)} – ${fmt(offer.salary_max)}${period}`;
-  if (offer.salary_min != null) return `Dès ${fmt(offer.salary_min)}${period}`;
-  return `Jusqu'à ${fmt(offer.salary_max!)}${period}`;
+    return `${fmt(offer.salary_min)} – ${fmt(offer.salary_max)}`;
+  if (offer.salary_min != null) return `Dès ${fmt(offer.salary_min)}`;
+  return `Jusqu'à ${fmt(offer.salary_max!)}`;
 }
 
 export default function OfferDetailPage({
@@ -35,7 +29,7 @@ export default function OfferDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = use(params);
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const [offer, setOffer] = useState<Offer | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -43,18 +37,27 @@ export default function OfferDetailPage({
   const [bookmarkLoading, setBookmarkLoading] = useState(false);
 
   useEffect(() => {
+    if (authLoading) return;
+    if (!user) {
+      setLoading(false);
+      setError("Connecte-toi pour consulter cette offre.");
+      return;
+    }
     api
       .getOffer(id)
       .then(setOffer)
-      .catch(() => setError("Offre introuvable."))
+      .catch((err: { status?: number }) =>
+        setError(err.status === 404 ? "Offre introuvable." : "Erreur de chargement.")
+      )
       .finally(() => setLoading(false));
-  }, [id]);
+  }, [id, user, authLoading]);
 
   useEffect(() => {
     if (!user) return;
-    api.getBookmarks().then((bms) => {
-      setBookmarked(bms.some((b) => b.offer_id === id));
-    }).catch(() => {});
+    api
+      .getSavedOffers()
+      .then((items) => setBookmarked(items.some((s) => s.offer_id === id)))
+      .catch(() => {});
   }, [user, id]);
 
   async function toggleBookmark() {
@@ -62,10 +65,10 @@ export default function OfferDetailPage({
     setBookmarkLoading(true);
     try {
       if (bookmarked) {
-        await api.removeBookmark(offer.id);
+        await api.removeSavedOffer(offer.id);
         setBookmarked(false);
       } else {
-        await api.addBookmark(offer.id);
+        await api.saveOffer(offer.id);
         setBookmarked(true);
       }
     } finally {
@@ -106,6 +109,9 @@ export default function OfferDetailPage({
   }
 
   const salary = formatSalary(offer);
+  const location = [offer.location_city, offer.location_country]
+    .filter(Boolean)
+    .join(", ");
 
   return (
     <div className="mx-auto max-w-4xl px-4 sm:px-6 py-8">
@@ -124,9 +130,11 @@ export default function OfferDetailPage({
             <h1 className="text-2xl font-bold text-white leading-tight">
               {offer.title}
             </h1>
-            <p className="mt-1 text-base font-medium text-blue-400">
-              {offer.company}
-            </p>
+            {offer.company && (
+              <p className="mt-1 text-base font-medium text-blue-400">
+                {offer.company}
+              </p>
+            )}
           </div>
           {user && (
             <Button
@@ -135,7 +143,9 @@ export default function OfferDetailPage({
               loading={bookmarkLoading}
               onClick={toggleBookmark}
               aria-pressed={bookmarked}
-              aria-label={bookmarked ? "Retirer des favoris" : "Ajouter aux favoris"}
+              aria-label={
+                bookmarked ? "Retirer des favoris" : "Ajouter aux favoris"
+              }
               className="shrink-0"
             >
               <svg
@@ -159,10 +169,10 @@ export default function OfferDetailPage({
 
         <div className="grid sm:grid-cols-2 gap-3 mb-6 p-4 rounded-xl border border-zinc-800 bg-zinc-900">
           <dl className="space-y-2">
-            {offer.location && (
+            {location && (
               <div className="flex items-center gap-2">
                 <dt className="text-xs text-zinc-500 w-24">Localisation</dt>
-                <dd className="text-sm text-zinc-200">{offer.location}</dd>
+                <dd className="text-sm text-zinc-200">{location}</dd>
               </div>
             )}
             <div className="flex items-center gap-2">
@@ -172,9 +182,9 @@ export default function OfferDetailPage({
               </dd>
             </div>
             <div className="flex items-center gap-2">
-              <dt className="text-xs text-zinc-500 w-24">Statut</dt>
+              <dt className="text-xs text-zinc-500 w-24">Télétravail</dt>
               <dd>
-                <StatusBadge status={offer.status} />
+                <RemoteBadge policy={offer.remote_policy} />
               </dd>
             </div>
           </dl>
@@ -186,84 +196,37 @@ export default function OfferDetailPage({
                 <dd className="text-sm text-green-400 font-medium">{salary}</dd>
               </div>
             )}
-            <div className="flex items-center gap-2">
-              <dt className="text-xs text-zinc-500 w-24">Publiée le</dt>
-              <dd className="text-sm text-zinc-200">
-                <time dateTime={offer.posted_at}>
-                  {new Date(offer.posted_at).toLocaleDateString("fr-FR", {
-                    day: "numeric",
-                    month: "long",
-                    year: "numeric",
-                  })}
-                </time>
-              </dd>
-            </div>
+            {offer.posted_at && (
+              <div className="flex items-center gap-2">
+                <dt className="text-xs text-zinc-500 w-24">Publiée le</dt>
+                <dd className="text-sm text-zinc-200">
+                  <time dateTime={offer.posted_at}>
+                    {new Date(offer.posted_at).toLocaleDateString("fr-FR", {
+                      day: "numeric",
+                      month: "long",
+                      year: "numeric",
+                    })}
+                  </time>
+                </dd>
+              </div>
+            )}
             <div className="flex items-center gap-2">
               <dt className="text-xs text-zinc-500 w-24">Source</dt>
-              <dd className="text-sm text-zinc-400 capitalize">{offer.source}</dd>
+              <dd className="text-sm text-zinc-400 capitalize">
+                {offer.source}
+              </dd>
             </div>
           </dl>
         </div>
-
-        {(offer.ai_category || (offer.ai_keywords && offer.ai_keywords.length > 0)) && (
-          <section
-            aria-label="Analyse IA"
-            className="mb-6 p-4 rounded-xl border border-violet-500/20 bg-violet-500/5"
-          >
-            <h2 className="text-xs font-semibold text-violet-400 uppercase tracking-wider mb-3">
-              Analyse IA
-            </h2>
-            {offer.ai_category && (
-              <p className="text-sm text-zinc-300 mb-2">
-                Catégorie :{" "}
-                <span className="font-medium text-violet-300">
-                  {offer.ai_category}
-                </span>
-              </p>
-            )}
-            {offer.ai_keywords && offer.ai_keywords.length > 0 && (
-              <div>
-                <p className="text-xs text-zinc-500 mb-2">Compétences détectées :</p>
-                <ul className="flex flex-wrap gap-1.5" aria-label="Mots-clés extraits par l'IA">
-                  {offer.ai_keywords.map((kw) => (
-                    <li key={kw}>
-                      <span className="inline-flex items-center px-2 py-0.5 text-xs rounded border bg-violet-500/10 text-violet-300 border-violet-500/20">
-                        {kw}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-          </section>
-        )}
 
         <section aria-label="Description du poste">
           <h2 className="text-sm font-semibold text-zinc-400 uppercase tracking-wider mb-3">
             Description
           </h2>
-          <div
-            className="prose prose-invert prose-sm max-w-none text-zinc-300 leading-relaxed whitespace-pre-wrap"
-            dangerouslySetInnerHTML={{ __html: offer.description.replace(/\n/g, "<br>") }}
-          />
-        </section>
-
-        {offer.source_url && (
-          <div className="mt-8">
-            <a
-              href={offer.source_url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium rounded-lg transition-colors"
-              aria-label={`Voir l'offre originale sur ${offer.source}`}
-            >
-              {"Voir l'offre originale"}
-              <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-              </svg>
-            </a>
+          <div className="prose prose-invert prose-sm max-w-none text-zinc-300 leading-relaxed whitespace-pre-wrap">
+            {offer.description}
           </div>
-        )}
+        </section>
       </article>
     </div>
   );

@@ -2,29 +2,29 @@
 
 import { useCallback, useEffect, useState } from "react";
 import * as api from "@/lib/api";
-import type { Offer, OffersFilter } from "@/lib/types";
+import type { OfferListItem, OffersFilter } from "@/lib/types";
 import { useAuth } from "@/context/auth-context";
 import { OfferCard } from "@/components/offers/offer-card";
 import { OfferFilters } from "@/components/offers/offer-filters";
 import { Button } from "@/components/ui/button";
 
-const DEFAULT_FILTER: OffersFilter = { page: 1, limit: 20 };
+const PAGE_SIZE = 20;
+const DEFAULT_FILTER: OffersFilter = { offset: 0, limit: PAGE_SIZE };
 
 export default function OffersPage() {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const [filters, setFilters] = useState<OffersFilter>(DEFAULT_FILTER);
-  const [offers, setOffers] = useState<Offer[]>([]);
-  const [total, setTotal] = useState(0);
-  const [totalPages, setTotalPages] = useState(1);
+  const [offers, setOffers] = useState<OfferListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [bookmarked, setBookmarked] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     if (!user) return;
-    api.getBookmarks().then((bms) => {
-      setBookmarked(new Set(bms.map((b) => b.offer_id)));
-    }).catch(() => {});
+    api
+      .getSavedOffers()
+      .then((items) => setBookmarked(new Set(items.map((s) => s.offer_id))))
+      .catch(() => {});
   }, [user]);
 
   const fetchOffers = useCallback(async (f: OffersFilter) => {
@@ -32,49 +32,63 @@ export default function OffersPage() {
     setError("");
     try {
       const res = await api.getOffers(f);
-      setOffers(res.data);
-      setTotal(res.total);
-      setTotalPages(res.total_pages);
-    } catch {
-      setError("Impossible de charger les offres. Réessaie plus tard.");
+      setOffers(res);
+    } catch (err) {
+      if ((err as { status?: number }).status === 401) {
+        // Not logged in — surface a friendly message; layout will let them log in.
+        setError("Connecte-toi pour voir les offres.");
+      } else {
+        setError("Impossible de charger les offres. Réessaie plus tard.");
+      }
     } finally {
       setLoading(false);
     }
   }, []);
 
   useEffect(() => {
+    if (authLoading) return;
     fetchOffers(filters);
-  }, [filters, fetchOffers]);
+  }, [filters, fetchOffers, authLoading]);
 
   async function toggleBookmark(offerId: string) {
     if (!user) return;
     const wasBookmarked = bookmarked.has(offerId);
     setBookmarked((prev) => {
       const next = new Set(prev);
-      if (wasBookmarked) { next.delete(offerId); } else { next.add(offerId); }
+      if (wasBookmarked) next.delete(offerId);
+      else next.add(offerId);
       return next;
     });
     try {
-      if (wasBookmarked) {
-        await api.removeBookmark(offerId);
-      } else {
-        await api.addBookmark(offerId);
-      }
+      if (wasBookmarked) await api.removeSavedOffer(offerId);
+      else await api.saveOffer(offerId);
     } catch {
       setBookmarked((prev) => {
         const next = new Set(prev);
-        if (wasBookmarked) { next.add(offerId); } else { next.delete(offerId); }
+        if (wasBookmarked) next.add(offerId);
+        else next.delete(offerId);
         return next;
       });
     }
   }
+
+  const offset = filters.offset ?? 0;
+  const limit = filters.limit ?? PAGE_SIZE;
+  // Backend doesn't return a total; infer "has next" from whether we got a full page.
+  const hasPrev = offset > 0;
+  const hasNext = offers.length >= limit;
+  const pageNumber = Math.floor(offset / limit) + 1;
 
   return (
     <div className="mx-auto max-w-7xl px-4 sm:px-6 py-8">
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-white">{"Offres d'emploi"}</h1>
         <p className="mt-1 text-sm text-zinc-400">
-          {loading ? "Chargement…" : `${total.toLocaleString("fr-FR")} offres trouvées`}
+          {loading
+            ? "Chargement…"
+            : offers.length === 0
+              ? "Aucune offre"
+              : `${offers.length} offre${offers.length > 1 ? "s" : ""} sur cette page`}
         </p>
       </div>
 
@@ -98,7 +112,11 @@ export default function OffersPage() {
           )}
 
           {loading ? (
-            <ul className="grid gap-4" aria-label="Chargement des offres" aria-busy="true">
+            <ul
+              className="grid gap-4"
+              aria-label="Chargement des offres"
+              aria-busy="true"
+            >
               {Array.from({ length: 6 }).map((_, i) => (
                 <li
                   key={i}
@@ -128,7 +146,7 @@ export default function OffersPage() {
             </ul>
           )}
 
-          {totalPages > 1 && (
+          {(hasPrev || hasNext) && (
             <nav
               className="mt-6 flex items-center justify-center gap-2"
               aria-label="Pagination"
@@ -136,23 +154,27 @@ export default function OffersPage() {
               <Button
                 variant="secondary"
                 size="sm"
-                disabled={filters.page === 1}
+                disabled={!hasPrev}
                 onClick={() =>
-                  setFilters((f) => ({ ...f, page: (f.page ?? 1) - 1 }))
+                  setFilters((f) => ({
+                    ...f,
+                    offset: Math.max(0, (f.offset ?? 0) - (f.limit ?? PAGE_SIZE)),
+                  }))
                 }
                 aria-label="Page précédente"
               >
                 Précédent
               </Button>
-              <span className="text-sm text-zinc-400">
-                Page {filters.page ?? 1} / {totalPages}
-              </span>
+              <span className="text-sm text-zinc-400">Page {pageNumber}</span>
               <Button
                 variant="secondary"
                 size="sm"
-                disabled={(filters.page ?? 1) >= totalPages}
+                disabled={!hasNext}
                 onClick={() =>
-                  setFilters((f) => ({ ...f, page: (f.page ?? 1) + 1 }))
+                  setFilters((f) => ({
+                    ...f,
+                    offset: (f.offset ?? 0) + (f.limit ?? PAGE_SIZE),
+                  }))
                 }
                 aria-label="Page suivante"
               >

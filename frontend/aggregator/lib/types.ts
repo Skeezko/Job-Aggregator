@@ -1,122 +1,83 @@
+// Types aligned with the Rust backend (snake_case JSON).
+
 export type UserRole = "user" | "admin";
 
 export type ContractType =
-  | "cdi"
-  | "cdd"
-  | "stage"
-  | "apprentissage"
+  | "internship"
+  | "apprenticeship"
+  | "full_time"
   | "freelance"
-  | "interim"
-  | "other";
+  | "unknown";
 
-export type OfferStatus = "active" | "closed" | "archived" | "flagged";
+export type RemotePolicy = "onsite" | "hybrid" | "remote" | "unknown";
 
-export type OfferSource = "welovedevs" | "manual";
+// Returned by GET /auth/me — minimal, server only knows id + role.
+export interface Me {
+  id: string;
+  role: UserRole;
+}
 
+// Returned by GET /admin/users — only available to admins.
 export interface User {
   id: string;
   email: string;
-  name: string | null;
+  firstname: string;
+  lastname: string;
   role: UserRole;
-  is_active: boolean;
-  email_verified: boolean;
   created_at: string;
-  updated_at: string;
 }
 
+// Returned by GET /offers (list item, lighter shape).
+export interface OfferListItem {
+  id: string;
+  title: string;
+  company: string | null;
+  location_city: string | null;
+  contract_type: ContractType;
+  remote_policy: RemotePolicy;
+}
+
+// Returned by GET /offers/{id} — full detail.
 export interface Offer {
   id: string;
-  source: OfferSource;
-  external_id: string;
-  source_url: string | null;
+  source: string;
+  source_id: string;
   title: string;
   description: string;
-  company: string;
-  location: string | null;
-  contract_type: ContractType | null;
+  company: string | null;
+  location_city: string | null;
+  location_country: string | null;
+  remote_policy: RemotePolicy;
+  contract_type: ContractType;
   salary_min: number | null;
   salary_max: number | null;
-  salary_currency: string;
-  salary_period: "hour" | "day" | "month" | "year" | null;
-  posted_at: string;
-  expires_at: string | null;
-  ingested_at: string;
-  status: OfferStatus;
-  ai_category: string | null;
-  ai_keywords: string[] | null;
-  ai_processed_at: string | null;
+  salary_currency: string | null;
+  posted_at: string | null;
 }
 
-export interface Bookmark {
+// Returned by GET /users/saved-offers — flat, with notes.
+export interface SavedOffer {
   offer_id: string;
-  bookmarked_at: string;
+  title: string;
+  company: string | null;
   notes: string | null;
-  offer: Offer;
-}
-
-export interface PaginatedResponse<T> {
-  data: T[];
-  total: number;
-  page: number;
-  limit: number;
-  total_pages: number;
+  saved_at: string;
 }
 
 export interface OffersFilter {
-  search?: string;
   contract_type?: ContractType;
-  location?: string;
-  salary_min?: number;
-  salary_max?: number;
-  ai_category?: string;
-  status?: OfferStatus;
-  page?: number;
+  remote_policy?: RemotePolicy;
+  city?: string;
   limit?: number;
+  offset?: number;
 }
 
-export interface DashboardStats {
-  total_offers: number;
-  active_offers: number;
-  by_contract_type: { contract_type: string; count: number }[];
-  by_location: { location: string; count: number }[];
-  by_company: { company: string; count: number }[];
-  salary_distribution: { range: string; count: number }[];
-  offers_over_time: { date: string; count: number }[];
-  ai_categories: { category: string; count: number }[];
-  top_keywords: { keyword: string; count: number }[];
-}
-
-export interface AdminStats {
-  total_users: number;
-  active_users: number;
-  total_offers: number;
-  flagged_offers: number;
-  last_ingestion: string | null;
-}
-
-export interface AuditLog {
-  id: string;
-  actor_user_id: string | null;
-  action: string;
-  target_type: string;
-  target_id: string | null;
-  metadata: Record<string, unknown> | null;
-  created_at: string;
-  actor?: User;
-}
-
-export interface AuthTokens {
+export interface LoginResponse {
   access_token: string;
-  token_type: string;
-  expires_in: number;
-}
-
-export interface LoginResponse extends AuthTokens {
-  user: User;
 }
 
 export interface ApiError {
+  code?: string;
   message: string;
-  errors?: Record<string, string[]>;
   status?: number;
 }

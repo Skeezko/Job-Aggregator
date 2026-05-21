@@ -1,7 +1,11 @@
 "use client";
 
 import { useCallback } from "react";
-import type { ContractType, OffersFilter } from "@/lib/types";
+import type {
+  ContractType,
+  OffersFilter,
+  RemotePolicy,
+} from "@/lib/types";
 import { Input, Select } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 
@@ -12,18 +16,22 @@ interface OfferFiltersProps {
 }
 
 const CONTRACT_TYPES: { value: ContractType; label: string }[] = [
-  { value: "cdi", label: "CDI" },
-  { value: "cdd", label: "CDD" },
-  { value: "stage", label: "Stage" },
-  { value: "apprentissage", label: "Alternance" },
+  { value: "full_time", label: "CDI" },
+  { value: "internship", label: "Stage" },
+  { value: "apprenticeship", label: "Alternance" },
   { value: "freelance", label: "Freelance" },
-  { value: "interim", label: "Intérim" },
+];
+
+const REMOTE_POLICIES: { value: RemotePolicy; label: string }[] = [
+  { value: "onsite", label: "Sur site" },
+  { value: "hybrid", label: "Hybride" },
+  { value: "remote", label: "Remote" },
 ];
 
 export function OfferFilters({ filters, onChange, onReset }: OfferFiltersProps) {
   const set = useCallback(
     (key: keyof OffersFilter, value: string | number | undefined) =>
-      onChange({ ...filters, [key]: value || undefined, page: 1 }),
+      onChange({ ...filters, [key]: value || undefined, offset: 0 }),
     [filters, onChange]
   );
 
@@ -37,24 +45,19 @@ export function OfferFilters({ filters, onChange, onReset }: OfferFiltersProps) 
       </h2>
 
       <Input
-        label="Recherche"
-        placeholder="Titre, entreprise…"
-        value={filters.search ?? ""}
-        onChange={(e) => set("search", e.target.value)}
-        aria-label="Rechercher des offres"
-      />
-
-      <Input
-        label="Localisation"
-        placeholder="Paris, Remote…"
-        value={filters.location ?? ""}
-        onChange={(e) => set("location", e.target.value)}
+        label="Ville"
+        placeholder="Paris, Lyon…"
+        value={filters.city ?? ""}
+        onChange={(e) => set("city", e.target.value)}
+        aria-label="Filtrer par ville"
       />
 
       <Select
         label="Type de contrat"
         value={filters.contract_type ?? ""}
-        onChange={(e) => set("contract_type", e.target.value)}
+        onChange={(e) =>
+          set("contract_type", e.target.value as ContractType | "")
+        }
       >
         <option value="">Tous les contrats</option>
         {CONTRACT_TYPES.map((ct) => (
@@ -64,41 +67,20 @@ export function OfferFilters({ filters, onChange, onReset }: OfferFiltersProps) 
         ))}
       </Select>
 
-      <fieldset className="flex flex-col gap-2">
-        <legend className="text-xs font-medium text-zinc-300">
-          Salaire (€/an)
-        </legend>
-        <div className="flex gap-2">
-          <Input
-            placeholder="Min"
-            type="number"
-            min={0}
-            step={5000}
-            value={filters.salary_min ?? ""}
-            onChange={(e) =>
-              set(
-                "salary_min",
-                e.target.value ? Number(e.target.value) : undefined
-              )
-            }
-            aria-label="Salaire minimum"
-          />
-          <Input
-            placeholder="Max"
-            type="number"
-            min={0}
-            step={5000}
-            value={filters.salary_max ?? ""}
-            onChange={(e) =>
-              set(
-                "salary_max",
-                e.target.value ? Number(e.target.value) : undefined
-              )
-            }
-            aria-label="Salaire maximum"
-          />
-        </div>
-      </fieldset>
+      <Select
+        label="Télétravail"
+        value={filters.remote_policy ?? ""}
+        onChange={(e) =>
+          set("remote_policy", e.target.value as RemotePolicy | "")
+        }
+      >
+        <option value="">Indifférent</option>
+        {REMOTE_POLICIES.map((rp) => (
+          <option key={rp.value} value={rp.value}>
+            {rp.label}
+          </option>
+        ))}
+      </Select>
 
       <Button
         variant="ghost"

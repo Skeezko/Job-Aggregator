@@ -17,7 +17,7 @@ concurrency:
 
 jobs:
   build-test:
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
     env:
       PG_CONTAINER: ci-postgres-${{ github.run_id }}
       DATABASE_URL: postgres://ci:ci@127.0.0.1:5544/ci

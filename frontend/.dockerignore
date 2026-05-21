@@ -1,0 +1,15 @@
+aggregator/node_modules
+aggregator/.next
+aggregator/coverage
+.git/
+.gitignore
+.env
+.env.local
+.env.*.local
+README.md
+*.md
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db

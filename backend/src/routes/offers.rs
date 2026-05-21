@@ -1,8 +1,9 @@
 use axum::{
-    extract::{Query, State},
+    extract::{Path, Query, State},
     http::StatusCode,
     Json,
 };
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::{Postgres, QueryBuilder};
 use uuid::Uuid;
@@ -27,6 +28,24 @@ pub struct OfferListItem {
     pub location_city: Option<String>,
     pub contract_type: ContractType,
     pub remote_policy: RemotePolicy,
+}
+
+#[derive(Serialize, sqlx::FromRow)]
+pub struct OfferDetail {
+    pub id: Uuid,
+    pub source: String,
+    pub source_id: String,
+    pub title: String,
+    pub description: String,
+    pub company: Option<String>,
+    pub location_city: Option<String>,
+    pub location_country: Option<String>,
+    pub remote_policy: RemotePolicy,
+    pub contract_type: ContractType,
+    pub salary_min: Option<i32>,
+    pub salary_max: Option<i32>,
+    pub salary_currency: Option<String>,
+    pub posted_at: Option<DateTime<Utc>>,
 }
 
 pub async fn list_offers(
@@ -74,4 +93,29 @@ pub async fn list_offers(
         })?;
 
     Ok(Json(offers))
+}
+
+pub async fn get_offer(
+    State(app_state): State<AppState>,
+    _user: AuthUser,
+    Path(offer_id): Path<Uuid>,
+) -> Result<Json<OfferDetail>, (StatusCode, String)> {
+    let row = sqlx::query_as::<_, OfferDetail>(
+        r#"
+        SELECT id, source, source_id, title, description, company,
+               location_city, location_country, remote_policy, contract_type,
+               salary_min, salary_max, salary_currency, posted_at
+        FROM offers
+        WHERE id = $1 AND is_active = TRUE
+        "#,
+    )
+    .bind(offer_id)
+    .fetch_optional(&app_state.db)
+    .await
+    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+    match row {
+        Some(offer) => Ok(Json(offer)),
+        None => Err((StatusCode::NOT_FOUND, "Offre introuvable".to_string())),
+    }
 }

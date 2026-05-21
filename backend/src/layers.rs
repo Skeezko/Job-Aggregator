@@ -94,6 +94,7 @@ pub fn ft_middleware_layers(cors_origins: Vec<HeaderValue>) -> Router<AppState> 
     // and in example.rs the function should be lked this:  pub async fn ft_example(user: AuthUser)
     let api_routes = Router::new()
         .route("/offers", axum::routing::get(crate::routes::offers::list_offers))
+        .route("/offers/{offer_id}", axum::routing::get(crate::routes::offers::get_offer))
         .route("/offers/{offer_id}/save", axum::routing::post(crate::routes::users::save_offer))
         .route("/users/saved-offers", axum::routing::get(crate::routes::users::get_saved_offers))
         .route("/users/saved-offers/{offer_id}", axum::routing::delete(crate::routes::users::remove_saved_offer))
